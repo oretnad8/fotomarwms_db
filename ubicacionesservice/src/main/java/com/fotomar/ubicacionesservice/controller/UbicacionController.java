@@ -2,6 +2,10 @@ package com.fotomar.ubicacionesservice.controller;
 
 import com.fotomar.ubicacionesservice.dto.AsignarProductoRequest;
 import com.fotomar.ubicacionesservice.dto.AsignarProductoResponse;
+import com.fotomar.ubicacionesservice.dto.EgresoProductoRequest;
+import com.fotomar.ubicacionesservice.dto.EgresoProductoResponse;
+import com.fotomar.ubicacionesservice.dto.ReubicarProductoRequest;
+import com.fotomar.ubicacionesservice.dto.ReubicarProductoResponse;
 import com.fotomar.ubicacionesservice.dto.UbicacionResponse;
 import com.fotomar.ubicacionesservice.service.UbicacionService;
 import jakarta.validation.Valid;
@@ -60,5 +64,19 @@ public class UbicacionController {
     public ResponseEntity<AsignarProductoResponse> asignarProducto(
             @Valid @RequestBody AsignarProductoRequest request) {
         return ResponseEntity.ok(ubicacionService.asignarProducto(request));
+    }
+    
+    @PostMapping("/egreso")
+    @PreAuthorize("hasAnyAuthority('JEFE', 'SUPERVISOR')")
+    public ResponseEntity<EgresoProductoResponse> egresoProducto(
+            @Valid @RequestBody EgresoProductoRequest request) {
+        return ResponseEntity.ok(ubicacionService.egresoProducto(request));
+    }
+    
+    @PostMapping("/reubicar")
+    @PreAuthorize("hasAnyAuthority('JEFE', 'SUPERVISOR')")
+    public ResponseEntity<ReubicarProductoResponse> reubicarProducto(
+            @Valid @RequestBody ReubicarProductoRequest request) {
+        return ResponseEntity.ok(ubicacionService.reubicarProducto(request));
     }
 }

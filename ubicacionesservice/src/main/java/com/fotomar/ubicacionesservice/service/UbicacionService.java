@@ -2,6 +2,10 @@ package com.fotomar.ubicacionesservice.service;
 
 import com.fotomar.ubicacionesservice.dto.AsignarProductoRequest;
 import com.fotomar.ubicacionesservice.dto.AsignarProductoResponse;
+import com.fotomar.ubicacionesservice.dto.EgresoProductoRequest;
+import com.fotomar.ubicacionesservice.dto.EgresoProductoResponse;
+import com.fotomar.ubicacionesservice.dto.ReubicarProductoRequest;
+import com.fotomar.ubicacionesservice.dto.ReubicarProductoResponse;
 import com.fotomar.ubicacionesservice.dto.UbicacionResponse;
 import com.fotomar.ubicacionesservice.exception.ProductoNotFoundException;
 import com.fotomar.ubicacionesservice.exception.StockInsuficienteException;
@@ -120,10 +124,14 @@ public class UbicacionService {
         
         productoUbicacionRepository.save(productoUbicacion);
         
+        // Incrementar stock del producto (INGRESO)
+        producto.setStock(producto.getStock() + request.getCantidad());
+        productoRepository.save(producto);
+        
         Integer nuevoStockAsignado = productoUbicacionRepository.sumCantidadByProductoSku(sku);
         Integer nuevoStockDisponible = producto.getStock() - nuevoStockAsignado;
         
-        log.info("Producto {} asignado a ubicación {}. Cantidad: {}", sku, codigoUbicacion, request.getCantidad());
+        log.info("Producto {} asignado a ubicación {}. Cantidad: {}. Nuevo stock: {}", sku, codigoUbicacion, request.getCantidad(), producto.getStock());
         
         return AsignarProductoResponse.builder()
                 .mensaje("Producto asignado exitosamente")
@@ -160,5 +168,150 @@ public class UbicacionService {
                 "Formato de código inválido. Debe ser: P[1-5]-[A|B|C]-[01-60]. Ejemplo: P1-A-01"
             );
         }
+    }
+    
+    @Transactional
+    public EgresoProductoResponse egresoProducto(EgresoProductoRequest request) {
+        String sku = request.getSku().toUpperCase();
+        String codigoUbicacion = request.getCodigoUbicacion().toUpperCase();
+        
+        // Validar formato de código de ubicación
+        validarFormatoCodigo(codigoUbicacion);
+        
+        // Verificar que el producto existe
+        Producto producto = productoRepository.findById(sku)
+                .orElseThrow(() -> new ProductoNotFoundException("Producto no encontrado: " + sku));
+        
+        // Verificar que la ubicación existe
+        Ubicacion ubicacion = ubicacionRepository.findByCodigoUbicacion(codigoUbicacion)
+                .orElseThrow(() -> new UbicacionNotFoundException("Ubicación no encontrada: " + codigoUbicacion));
+        
+        // Buscar la asignación en esta ubicación
+        ProductoUbicacion productoUbicacion = productoUbicacionRepository
+                .findByProductoSkuAndUbicacionIdUbicacion(sku, ubicacion.getIdUbicacion())
+                .orElseThrow(() -> new RuntimeException(
+                        String.format("El producto %s no se encuentra en la ubicación %s", sku, codigoUbicacion)));
+        
+        // Verificar que hay suficiente cantidad en la ubicación
+        if (productoUbicacion.getCantidadEnUbicacion() < request.getCantidad()) {
+            throw new StockInsuficienteException(
+                    String.format("Cantidad insuficiente en ubicación. Disponible: %d, Solicitado: %d",
+                            productoUbicacion.getCantidadEnUbicacion(), request.getCantidad()));
+        }
+        
+        // Reducir cantidad en ubicación
+        productoUbicacion.setCantidadEnUbicacion(
+                productoUbicacion.getCantidadEnUbicacion() - request.getCantidad());
+        
+        // Si la cantidad llega a 0, eliminar la asignación
+        if (productoUbicacion.getCantidadEnUbicacion() == 0) {
+            productoUbicacionRepository.delete(productoUbicacion);
+        } else {
+            productoUbicacionRepository.save(productoUbicacion);
+        }
+        
+        // Reducir stock del producto
+        producto.setStock(producto.getStock() - request.getCantidad());
+        productoRepository.save(producto);
+        
+        Integer cantidadRestante = productoUbicacion.getCantidadEnUbicacion() == 0 ? 
+                0 : productoUbicacion.getCantidadEnUbicacion();
+        
+        log.info("Egreso de producto {} desde ubicación {}. Cantidad: {}", sku, codigoUbicacion, request.getCantidad());
+        
+        return EgresoProductoResponse.builder()
+                .mensaje("Egreso registrado exitosamente")
+                .sku(sku)
+                .codigoUbicacion(codigoUbicacion)
+                .cantidadRetirada(request.getCantidad())
+                .stockProducto(producto.getStock())
+                .cantidadRestanteEnUbicacion(cantidadRestante)
+                .build();
+    }
+    
+    @Transactional
+    public ReubicarProductoResponse reubicarProducto(ReubicarProductoRequest request) {
+        String sku = request.getSku().toUpperCase();
+        String codigoOrigen = request.getCodigoUbicacionOrigen().toUpperCase();
+        String codigoDestino = request.getCodigoUbicacionDestino().toUpperCase();
+        
+        // Validar que origen y destino sean diferentes
+        if (codigoOrigen.equals(codigoDestino)) {
+            throw new IllegalArgumentException("La ubicación de origen y destino deben ser diferentes");
+        }
+        
+        // Validar formatos
+        validarFormatoCodigo(codigoOrigen);
+        validarFormatoCodigo(codigoDestino);
+        
+        // Verificar que el producto existe
+        Producto producto = productoRepository.findById(sku)
+                .orElseThrow(() -> new ProductoNotFoundException("Producto no encontrado: " + sku));
+        
+        // Verificar que las ubicaciones existen
+        Ubicacion ubicacionOrigen = ubicacionRepository.findByCodigoUbicacion(codigoOrigen)
+                .orElseThrow(() -> new UbicacionNotFoundException("Ubicación origen no encontrada: " + codigoOrigen));
+        
+        Ubicacion ubicacionDestino = ubicacionRepository.findByCodigoUbicacion(codigoDestino)
+                .orElseThrow(() -> new UbicacionNotFoundException("Ubicación destino no encontrada: " + codigoDestino));
+        
+        // Buscar la asignación en ubicación origen
+        ProductoUbicacion productoUbicacionOrigen = productoUbicacionRepository
+                .findByProductoSkuAndUbicacionIdUbicacion(sku, ubicacionOrigen.getIdUbicacion())
+                .orElseThrow(() -> new RuntimeException(
+                        String.format("El producto %s no se encuentra en la ubicación origen %s", sku, codigoOrigen)));
+        
+        // Verificar que hay suficiente cantidad en origen
+        if (productoUbicacionOrigen.getCantidadEnUbicacion() < request.getCantidad()) {
+            throw new StockInsuficienteException(
+                    String.format("Cantidad insuficiente en ubicación origen. Disponible: %d, Solicitado: %d",
+                            productoUbicacionOrigen.getCantidadEnUbicacion(), request.getCantidad()));
+        }
+        
+        // Reducir cantidad en origen
+        productoUbicacionOrigen.setCantidadEnUbicacion(
+                productoUbicacionOrigen.getCantidadEnUbicacion() - request.getCantidad());
+        
+        Integer cantidadRestanteOrigen;
+        // Si la cantidad en origen llega a 0, eliminar la asignación
+        if (productoUbicacionOrigen.getCantidadEnUbicacion() == 0) {
+            productoUbicacionRepository.delete(productoUbicacionOrigen);
+            cantidadRestanteOrigen = 0;
+        } else {
+            productoUbicacionRepository.save(productoUbicacionOrigen);
+            cantidadRestanteOrigen = productoUbicacionOrigen.getCantidadEnUbicacion();
+        }
+        
+        // Buscar o crear asignación en destino
+        ProductoUbicacion productoUbicacionDestino = productoUbicacionRepository
+                .findByProductoSkuAndUbicacionIdUbicacion(sku, ubicacionDestino.getIdUbicacion())
+                .orElse(null);
+        
+        if (productoUbicacionDestino != null) {
+            // Ya existe, incrementar cantidad
+            productoUbicacionDestino.setCantidadEnUbicacion(
+                    productoUbicacionDestino.getCantidadEnUbicacion() + request.getCantidad());
+        } else {
+            // Nueva asignación en destino
+            productoUbicacionDestino = new ProductoUbicacion();
+            productoUbicacionDestino.setProducto(producto);
+            productoUbicacionDestino.setUbicacion(ubicacionDestino);
+            productoUbicacionDestino.setCantidadEnUbicacion(request.getCantidad());
+        }
+        
+        productoUbicacionRepository.save(productoUbicacionDestino);
+        
+        log.info("Producto {} reubicado de {} a {}. Cantidad: {}", 
+                sku, codigoOrigen, codigoDestino, request.getCantidad());
+        
+        return ReubicarProductoResponse.builder()
+                .mensaje("Reubicación realizada exitosamente")
+                .sku(sku)
+                .codigoUbicacionOrigen(codigoOrigen)
+                .codigoUbicacionDestino(codigoDestino)
+                .cantidadMovida(request.getCantidad())
+                .cantidadRestanteEnOrigen(cantidadRestanteOrigen)
+                .cantidadEnDestino(productoUbicacionDestino.getCantidadEnUbicacion())
+                .build();
     }
 }

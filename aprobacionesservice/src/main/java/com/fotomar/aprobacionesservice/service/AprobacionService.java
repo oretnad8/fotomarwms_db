@@ -1,5 +1,6 @@
 package com.fotomar.aprobacionesservice.service;
 
+import com.fotomar.aprobacionesservice.client.UbicacionesClient;
 import com.fotomar.aprobacionesservice.dto.AprobacionRequest;
 import com.fotomar.aprobacionesservice.dto.AprobacionResponse;
 import com.fotomar.aprobacionesservice.dto.AprobarRequest;
@@ -9,6 +10,7 @@ import com.fotomar.aprobacionesservice.exception.AprobacionNotFoundException;
 import com.fotomar.aprobacionesservice.model.Aprobacion;
 import com.fotomar.aprobacionesservice.model.Usuario;
 import com.fotomar.aprobacionesservice.repository.AprobacionRepository;
+import com.fotomar.aprobacionesservice.repository.UbicacionMappingRepository;
 import com.fotomar.aprobacionesservice.repository.UsuarioRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -26,6 +28,8 @@ public class AprobacionService {
     
     private final AprobacionRepository aprobacionRepository;
     private final UsuarioRepository usuarioRepository;
+    private final UbicacionesClient ubicacionesClient;
+    private final UbicacionMappingRepository ubicacionMappingRepository;
     
     public List<AprobacionResponse> getAllAprobaciones(Aprobacion.Estado estado) {
         List<Aprobacion> aprobaciones;
@@ -109,6 +113,15 @@ public class AprobacionService {
         
         Aprobacion updatedAprobacion = aprobacionRepository.save(aprobacion);
         
+        // Ejecutar el movimiento en el servicio de ubicaciones
+        try {
+            ejecutarMovimiento(updatedAprobacion);
+        } catch (Exception e) {
+            log.error("Error al ejecutar movimiento para aprobación {}: {}", id, e.getMessage());
+            // No revertir la aprobación, pero registrar el error
+            // En producción, esto debería manejarse con un sistema de reintentos
+        }
+        
         log.info("Aprobación {} aprobada por {} ({})", 
                 id, aprobador.getNombre(), aprobador.getRol());
         
@@ -157,5 +170,48 @@ public class AprobacionService {
         return aprobaciones.stream()
                 .map(AprobacionResponse::fromEntity)
                 .collect(Collectors.toList());
+    }
+    
+    private void ejecutarMovimiento(Aprobacion aprobacion) {
+        String sku = aprobacion.getSku();
+        Integer cantidad = aprobacion.getCantidad();
+        
+        switch (aprobacion.getTipoMovimiento()) {
+            case INGRESO:
+                if (aprobacion.getIdUbicacionDestino() == null) {
+                    throw new IllegalStateException("INGRESO requiere ubicación destino");
+                }
+                String codigoDestino = obtenerCodigoUbicacion(aprobacion.getIdUbicacionDestino());
+                ubicacionesClient.registrarIngreso(sku, codigoDestino, cantidad);
+                log.info("Movimiento INGRESO ejecutado: {} unidades de {} en {}", cantidad, sku, codigoDestino);
+                break;
+                
+            case EGRESO:
+                if (aprobacion.getIdUbicacionOrigen() == null) {
+                    throw new IllegalStateException("EGRESO requiere ubicación origen");
+                }
+                String codigoOrigen = obtenerCodigoUbicacion(aprobacion.getIdUbicacionOrigen());
+                ubicacionesClient.registrarEgreso(sku, codigoOrigen, cantidad);
+                log.info("Movimiento EGRESO ejecutado: {} unidades de {} desde {}", cantidad, sku, codigoOrigen);
+                break;
+                
+            case REUBICACION:
+                if (aprobacion.getIdUbicacionOrigen() == null || aprobacion.getIdUbicacionDestino() == null) {
+                    throw new IllegalStateException("REUBICACION requiere ubicación origen y destino");
+                }
+                String codigoOrigenReub = obtenerCodigoUbicacion(aprobacion.getIdUbicacionOrigen());
+                String codigoDestinoReub = obtenerCodigoUbicacion(aprobacion.getIdUbicacionDestino());
+                ubicacionesClient.registrarReubicacion(sku, codigoOrigenReub, codigoDestinoReub, cantidad);
+                log.info("Movimiento REUBICACION ejecutado: {} unidades de {} de {} a {}", 
+                        cantidad, sku, codigoOrigenReub, codigoDestinoReub);
+                break;
+        }
+    }
+    
+    private String obtenerCodigoUbicacion(Integer idUbicacion) {
+        return ubicacionMappingRepository.findById(idUbicacion)
+                .map(mapping -> mapping.getCodigoUbicacion())
+                .orElseThrow(() -> new RuntimeException(
+                        "No se encontró el código de ubicación para ID: " + idUbicacion));
     }
 }
