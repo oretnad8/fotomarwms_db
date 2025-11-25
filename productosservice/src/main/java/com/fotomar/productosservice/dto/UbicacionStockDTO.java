@@ -11,8 +11,9 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class UbicacionStockDTO {
     private Integer idUbicacion;
-    private String codigoUbicacion;
-    private Character piso;
-    private Integer numero;
+    private String codigoUbicacion; // P1-A-01
+    private Integer pasillo; // 1-5
+    private Character piso; // A, B, C
+    private Integer numero; // 1-60
     private Integer cantidad;
 }

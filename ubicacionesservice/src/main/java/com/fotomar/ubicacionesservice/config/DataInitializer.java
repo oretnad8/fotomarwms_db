@@ -17,27 +17,40 @@ public class DataInitializer implements CommandLineRunner {
     @Override
     public void run(String... args) {
         if (ubicacionRepository.count() == 0) {
-            log.info("Inicializando ubicaciones...");
+            log.info("Inicializando ubicaciones del sistema de pasillos...");
             
+            int pasillos = 5;        // P1 a P5
+            int posiciones = 60;     // 01 a 60
             char[] pisos = {'A', 'B', 'C'};
             
-            for (char piso : pisos) {
-                for (int numero = 1; numero <= 60; numero++) {
-                    String codigoUbicacion = String.format("%c-%02d", piso, numero);
-                    
-                    if (!ubicacionRepository.existsByCodigoUbicacion(codigoUbicacion)) {
-                        Ubicacion ubicacion = new Ubicacion();
-                        ubicacion.setCodigoUbicacion(codigoUbicacion);
-                        ubicacion.setPiso(piso);
-                        ubicacion.setNumero(numero);
-                        ubicacionRepository.save(ubicacion);
+            int contador = 0;
+            
+            for (int pasillo = 1; pasillo <= pasillos; pasillo++) {
+                for (int numero = 1; numero <= posiciones; numero++) {
+                    for (char piso : pisos) {
+                        String codigoUbicacion = String.format("P%d-%c-%02d", pasillo, piso, numero);
+                        
+                        if (!ubicacionRepository.existsByCodigoUbicacion(codigoUbicacion)) {
+                            Ubicacion ubicacion = new Ubicacion();
+                            ubicacion.setCodigoUbicacion(codigoUbicacion);
+                            ubicacion.setPasillo(pasillo);
+                            ubicacion.setPiso(piso);
+                            ubicacion.setNumero(numero);
+                            ubicacionRepository.save(ubicacion);
+                            contador++;
+                        }
                     }
                 }
             }
             
-            log.info("180 ubicaciones creadas exitosamente (A-01 a C-60)");
+            log.info("✅ {} ubicaciones creadas exitosamente", contador);
+            log.info("   - 5 pasillos (P1 a P5)");
+            log.info("   - 60 posiciones por pasillo (01-60)");
+            log.info("   - 3 pisos por posición (A, B, C)");
+            log.info("   - Total: 900 ubicaciones (P1-A-01 a P5-C-60)");
         } else {
-            log.info("Las ubicaciones ya están inicializadas");
+            log.info("Las ubicaciones ya están inicializadas ({} ubicaciones)", 
+                    ubicacionRepository.count());
         }
     }
 }

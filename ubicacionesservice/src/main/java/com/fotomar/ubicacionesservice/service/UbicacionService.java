@@ -36,11 +36,31 @@ public class UbicacionService {
     }
     
     public List<UbicacionResponse> getUbicacionesByPiso(Character piso) {
-        if (piso != 'A' && piso != 'B' && piso != 'C') {
-            throw new IllegalArgumentException("Piso debe ser A, B o C");
-        }
-        
-        return ubicacionRepository.findByPisoOrderByNumero(piso).stream()
+        validarPiso(piso);
+        return ubicacionRepository.findByPisoOrderByPasilloAscNumeroAsc(piso).stream()
+                .map(UbicacionResponse::fromEntity)
+                .collect(Collectors.toList());
+    }
+    
+    public List<UbicacionResponse> getUbicacionesByPasillo(Integer pasillo) {
+        validarPasillo(pasillo);
+        return ubicacionRepository.findByPasilloOrderByPisoAscNumeroAsc(pasillo).stream()
+                .map(UbicacionResponse::fromEntity)
+                .collect(Collectors.toList());
+    }
+    
+    public List<UbicacionResponse> getUbicacionesByPasilloPiso(Integer pasillo, Character piso) {
+        validarPasillo(pasillo);
+        validarPiso(piso);
+        return ubicacionRepository.findByPasilloAndPisoOrderByNumero(pasillo, piso).stream()
+                .map(UbicacionResponse::fromEntity)
+                .collect(Collectors.toList());
+    }
+    
+    public List<UbicacionResponse> getUbicacionesByPasilloNumero(Integer pasillo, Integer numero) {
+        validarPasillo(pasillo);
+        validarNumero(numero);
+        return ubicacionRepository.findByPasilloAndNumeroOrderByPiso(pasillo, numero).stream()
                 .map(UbicacionResponse::fromEntity)
                 .collect(Collectors.toList());
     }
@@ -55,6 +75,9 @@ public class UbicacionService {
     public AsignarProductoResponse asignarProducto(AsignarProductoRequest request) {
         String sku = request.getSku().toUpperCase();
         String codigoUbicacion = request.getCodigoUbicacion().toUpperCase();
+        
+        // Validar formato de código de ubicación (P1-A-01 a P5-C-60)
+        validarFormatoCodigo(codigoUbicacion);
         
         // Verificar que el producto existe
         Producto producto = productoRepository.findById(sku)
@@ -109,5 +132,33 @@ public class UbicacionService {
                 .cantidadAsignada(request.getCantidad())
                 .stockRestante(nuevoStockDisponible)
                 .build();
+    }
+    
+    // Validaciones
+    private void validarPiso(Character piso) {
+        if (piso != 'A' && piso != 'B' && piso != 'C') {
+            throw new IllegalArgumentException("Piso debe ser A, B o C");
+        }
+    }
+    
+    private void validarPasillo(Integer pasillo) {
+        if (pasillo < 1 || pasillo > 5) {
+            throw new IllegalArgumentException("Pasillo debe estar entre 1 y 5");
+        }
+    }
+    
+    private void validarNumero(Integer numero) {
+        if (numero < 1 || numero > 60) {
+            throw new IllegalArgumentException("Número de posición debe estar entre 1 y 60");
+        }
+    }
+    
+    private void validarFormatoCodigo(String codigo) {
+        // Formato esperado: P1-A-01 a P5-C-60
+        if (!codigo.matches("^P[1-5]-[ABC]-[0-5][0-9]$")) {
+            throw new IllegalArgumentException(
+                "Formato de código inválido. Debe ser: P[1-5]-[A|B|C]-[01-60]. Ejemplo: P1-A-01"
+            );
+        }
     }
 }

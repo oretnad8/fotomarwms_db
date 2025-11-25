@@ -1,7 +1,7 @@
 package com.fotomar.ubicacionesservice.dto;
 
+import com.fotomar.ubicacionesservice.model.ProductoUbicacion; 
 import com.fotomar.ubicacionesservice.model.Ubicacion;
-import com.fotomar.ubicacionesservice.model.ProductoUbicacion;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -16,9 +16,10 @@ import java.util.stream.Collectors;
 @AllArgsConstructor
 public class UbicacionResponse {
     private Integer idUbicacion;
-    private String codigoUbicacion;
-    private Character piso;
-    private Integer numero;
+    private String codigoUbicacion; // P1-A-01
+    private Integer pasillo; // 1-5
+    private Character piso; // A, B, C
+    private Integer numero; // 1-60
     private List<ProductoEnUbicacionDTO> productos;
     private Integer totalProductos;
     private Integer cantidadTotal;
@@ -41,6 +42,7 @@ public class UbicacionResponse {
         return UbicacionResponse.builder()
                 .idUbicacion(ubicacion.getIdUbicacion())
                 .codigoUbicacion(ubicacion.getCodigoUbicacion())
+                .pasillo(ubicacion.getPasillo())
                 .piso(ubicacion.getPiso())
                 .numero(ubicacion.getNumero())
                 .productos(productosDTO)

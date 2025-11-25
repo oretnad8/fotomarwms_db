@@ -16,8 +16,12 @@ public interface ProductoRepository extends JpaRepository<Producto, String> {
            "LEFT JOIN pu.ubicacion u " +
            "WHERE LOWER(p.sku) LIKE LOWER(CONCAT('%', :query, '%')) " +
            "OR LOWER(p.descripcion) LIKE LOWER(CONCAT('%', :query, '%')) " +
+           "OR LOWER(p.codigoBarrasIndividual) LIKE LOWER(CONCAT('%', :query, '%')) " +
+           "OR LOWER(p.lpn) LIKE LOWER(CONCAT('%', :query, '%')) " +
+           "OR LOWER(p.lpnDesc) LIKE LOWER(CONCAT('%', :query, '%')) " +
            "OR LOWER(u.codigoUbicacion) LIKE LOWER(CONCAT('%', :query, '%'))")
     List<Producto> searchProductos(@Param("query") String query);
     
+
     List<Producto> findByVencimientoCercanoTrue();
 }

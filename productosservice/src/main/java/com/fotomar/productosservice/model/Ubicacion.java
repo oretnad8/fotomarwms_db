@@ -17,12 +17,15 @@ public class Ubicacion {
     @Column(name = "id_ubicacion")
     private Integer idUbicacion;
     
-    @Column(name = "codigo_ubicacion", length = 10, unique = true, nullable = false)
-    private String codigoUbicacion;
-    
-    @Column(length = 1, nullable = false)
-    private Character piso;
+    @Column(name = "codigo_ubicacion", length = 15, unique = true, nullable = false)
+    private String codigoUbicacion; // P1-A-01
     
     @Column(nullable = false)
-    private Integer numero;
+    private Integer pasillo; // 1 a 5
+    
+    @Column(length = 1, nullable = false)
+    private Character piso; // A, B, C
+    
+    @Column(nullable = false)
+    private Integer numero; // 1 a 60
 }

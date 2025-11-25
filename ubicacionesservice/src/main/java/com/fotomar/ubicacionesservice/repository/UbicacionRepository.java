@@ -10,6 +10,18 @@ import java.util.Optional;
 @Repository
 public interface UbicacionRepository extends JpaRepository<Ubicacion, Integer> {
     Optional<Ubicacion> findByCodigoUbicacion(String codigoUbicacion);
-    List<Ubicacion> findByPisoOrderByNumero(Character piso);
+    
+    // Buscar por piso (todos los pasillos)
+    List<Ubicacion> findByPisoOrderByPasilloAscNumeroAsc(Character piso);
+    
+    // Buscar por pasillo (todos los pisos)
+    List<Ubicacion> findByPasilloOrderByPisoAscNumeroAsc(Integer pasillo);
+    
+    // Buscar por pasillo y piso
+    List<Ubicacion> findByPasilloAndPisoOrderByNumero(Integer pasillo, Character piso);
+    
+    // Buscar por pasillo y número (todos los pisos)
+    List<Ubicacion> findByPasilloAndNumeroOrderByPiso(Integer pasillo, Integer numero);
+    
     boolean existsByCodigoUbicacion(String codigoUbicacion);
 }

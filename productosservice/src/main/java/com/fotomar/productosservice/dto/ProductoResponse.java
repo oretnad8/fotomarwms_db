@@ -30,6 +30,7 @@ public class ProductoResponse {
                 .map(pu -> UbicacionStockDTO.builder()
                         .idUbicacion(pu.getUbicacion().getIdUbicacion())
                         .codigoUbicacion(pu.getUbicacion().getCodigoUbicacion())
+                        .pasillo(pu.getUbicacion().getPasillo())
                         .piso(pu.getUbicacion().getPiso())
                         .numero(pu.getUbicacion().getNumero())
                         .cantidad(pu.getCantidadEnUbicacion())
