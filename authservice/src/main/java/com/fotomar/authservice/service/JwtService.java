@@ -15,23 +15,24 @@ import io.jsonwebtoken.security.Keys;
 
 @Service
 public class JwtService {
-    
+
     @Value("${jwt.secret}")
     private String secret;
-    
+
     @Value("${jwt.expiration}")
     private Long expiration;
-    
+
     private SecretKey getSigningKey() {
         return Keys.hmacShaKeyFor(secret.getBytes());
     }
-    
-    public String generateToken(Integer userId, String email, String rol) {
+
+    public String generateToken(Integer userId, String email, String rol, String nombre) {
         Map<String, Object> claims = new HashMap<>();
         claims.put("userId", userId);
         claims.put("email", email);
         claims.put("rol", rol);
-        
+        claims.put("nombre", nombre);
+
         return Jwts.builder()
                 .claims(claims)
                 .subject(email)
@@ -40,14 +41,15 @@ public class JwtService {
                 .signWith(getSigningKey())
                 .compact();
     }
-    
+
     public Claims extractAllClaims(String token) {
-    // Ensure we call build() before parseClaimsJws in case parser() returns a builder type
-    return Jwts.parser()
-        .setSigningKey(getSigningKey())
-        .build()
-        .parseClaimsJws(token)
-        .getBody();
+        // Ensure we call build() before parseClaimsJws in case parser() returns a
+        // builder type
+        return Jwts.parser()
+                .setSigningKey(getSigningKey())
+                .build()
+                .parseClaimsJws(token)
+                .getBody();
     }
 
     public String extractEmail(String token) {

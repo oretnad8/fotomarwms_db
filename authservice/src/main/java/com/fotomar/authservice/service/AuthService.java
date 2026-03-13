@@ -22,15 +22,15 @@ public class AuthService {
     private final TokenBlacklistService tokenBlacklistService;
 
     public AuthService(UsuarioRepository usuarioRepository,
-                       PasswordEncoder passwordEncoder,
-                       JwtService jwtService,
-                       TokenBlacklistService tokenBlacklistService) {
+            PasswordEncoder passwordEncoder,
+            JwtService jwtService,
+            TokenBlacklistService tokenBlacklistService) {
         this.usuarioRepository = usuarioRepository;
         this.passwordEncoder = passwordEncoder;
         this.jwtService = jwtService;
         this.tokenBlacklistService = tokenBlacklistService;
     }
-    
+
     public LoginResponse login(LoginRequest request) {
         log.debug("Login attempt for email={}", request.getEmail());
         Usuario usuario = usuarioRepository.findByEmailAndActivoTrue(request.getEmail())
@@ -44,14 +44,14 @@ public class AuthService {
         if (!matches) {
             throw new InvalidCredentialsException("Credenciales inválidas");
         }
-        
-    String token = jwtService.generateToken(
-        usuario.getId(),
-        usuario.getEmail(),
-        usuario.getRol().name()
-    );
-    log.debug("Token generated for user {}: (hidden)", usuario.getEmail());
-        
+
+        String token = jwtService.generateToken(
+                usuario.getId(),
+                usuario.getEmail(),
+                usuario.getRol().name(),
+                usuario.getNombre());
+        log.debug("Token generated for user {}: (hidden)", usuario.getEmail());
+
         return LoginResponse.builder()
                 .token(token)
                 .type("Bearer")
@@ -61,7 +61,7 @@ public class AuthService {
                 .rol(usuario.getRol())
                 .build();
     }
-    
+
     public ValidateTokenResponse validateToken(String token) {
         try {
             // first basic JWT validation
@@ -98,7 +98,7 @@ public class AuthService {
                     .build();
         }
     }
-    
+
     public void logout(String token) {
         try {
             long expMillis = jwtService.extractExpirationMillis(token);
