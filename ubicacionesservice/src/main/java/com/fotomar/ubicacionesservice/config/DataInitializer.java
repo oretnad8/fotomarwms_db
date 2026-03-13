@@ -7,50 +7,87 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.stereotype.Component;
 
+import java.util.Map;
+
 @Component
 @RequiredArgsConstructor
 @Slf4j
 public class DataInitializer implements CommandLineRunner {
-    
+
     private final UbicacionRepository ubicacionRepository;
-    
+
     @Override
-    public void run(String... args) {
-        if (ubicacionRepository.count() == 0) {
-            log.info("Inicializando ubicaciones del sistema de pasillos...");
-            
-            int pasillos = 5;        // P1 a P5
-            int posiciones = 60;     // 01 a 60
-            char[] pisos = {'A', 'B', 'C'};
-            
-            int contador = 0;
-            
-            for (int pasillo = 1; pasillo <= pasillos; pasillo++) {
-                for (int numero = 1; numero <= posiciones; numero++) {
-                    for (char piso : pisos) {
-                        String codigoUbicacion = String.format("P%d-%c-%02d", pasillo, piso, numero);
-                        
-                        if (!ubicacionRepository.existsByCodigoUbicacion(codigoUbicacion)) {
-                            Ubicacion ubicacion = new Ubicacion();
-                            ubicacion.setCodigoUbicacion(codigoUbicacion);
-                            ubicacion.setPasillo(pasillo);
-                            ubicacion.setPiso(piso);
-                            ubicacion.setNumero(numero);
-                            ubicacionRepository.save(ubicacion);
-                            contador++;
-                        }
+    public void run(String... args) throws Exception {
+        log.info("Iniciando inicialización completa de la tabla de ubicaciones...");
+
+        // 1. Ubicaciones Estándar (P1 a P5, Zone A, B, C, Posiciones variables)
+        char[] pisos = { 'A', 'B', 'C' };
+        int countStandard = 0;
+        Map<Integer, Integer> limitsPerFloor = Map.of(
+                1, 57,
+                2, 43,
+                3, 28,
+                4, 16,
+                5, 12);
+
+        for (int pasillo = 1; pasillo <= 5; pasillo++) {
+            int maxPositions = limitsPerFloor.getOrDefault(pasillo, 60);
+            for (char piso : pisos) {
+                for (int numero = 1; numero <= maxPositions; numero++) {
+                    String codigo = String.format("P%d-%c-%02d", pasillo, piso, numero);
+                    if (!ubicacionRepository.existsByCodigoUbicacion(codigo)) {
+                        Ubicacion u = new Ubicacion();
+                        u.setCodigoUbicacion(codigo);
+                        u.setPasillo(pasillo);
+                        u.setPiso(piso);
+                        u.setNumero(numero);
+                        u.setEsEstante(false);
+                        ubicacionRepository.save(u);
+                        countStandard++;
                     }
                 }
             }
-            
-            log.info("✅ {} ubicaciones creadas exitosamente", contador);
-            log.info("   - 5 pasillos (P1 a P5)");
-            log.info("   - 60 posiciones por pasillo (01-60)");
-            log.info("   - 3 pisos por posición (A, B, C)");
-            log.info("   - Total: 900 ubicaciones (P1-A-01 a P5-C-60)");
-        } else {
-            log.info("Las ubicaciones ya están inicializadas ({} ubicaciones)", 
-                    ubicacionRepository.count());
         }
+        if (countStandard > 0) {
+            log.info("Se crearon {} ubicaciones estándar.", countStandard);
+        }
+
+        // 2. Ubicaciones Especiales (Estantes P3)
+        // Usamos LinkedHashMap para garantizar el orden de los IDs según la realidad
+        // física
+        Map<Integer, Integer> configEstantes = new java.util.LinkedHashMap<>();
+        configEstantes.put(13, 10);
+        configEstantes.put(15, 10);
+        configEstantes.put(29, 5);
+        configEstantes.put(31, 3);
+        configEstantes.put(30, 5);
+        configEstantes.put(9, 10);
+        configEstantes.put(11, 10);
+
+        int countSpecial = 0;
+        for (Map.Entry<Integer, Integer> entry : configEstantes.entrySet()) {
+            Integer numero = entry.getKey();
+            Integer niveles = entry.getValue();
+            for (int nivel = 1; nivel <= niveles; nivel++) {
+                String codigo = String.format("P3-A/EST-%d,%d", numero, nivel);
+                if (!ubicacionRepository.existsByCodigoUbicacion(codigo)) {
+                    Ubicacion ubicacion = new Ubicacion();
+                    ubicacion.setCodigoUbicacion(codigo);
+                    ubicacion.setPasillo(3);
+                    ubicacion.setPiso('A');
+                    ubicacion.setNumero(numero);
+                    ubicacion.setNivel(nivel);
+                    ubicacion.setEsEstante(true);
+
+                    ubicacionRepository.save(ubicacion);
+                    countSpecial++;
+                }
+            }
+        }
+        if (countSpecial > 0) {
+            log.info("Se crearon {} ubicaciones de estantes especiales.", countSpecial);
+        }
+
+        log.info("Finalizada la inicialización de la tabla de ubicaciones.");
     }
 }
